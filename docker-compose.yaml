@@ -1,0 +1,85 @@
+services:
+  db:
+    container_name: myapp-db
+    restart: unless-stopped
+    image: postgres:17.2
+    environment:
+      - PGDATA=/var/lib/postgresql/data/pgdatadb
+    volumes:
+      - ./db/init:/docker-entrypoint-initdb.d/
+      - ./runtime/db:/var/lib/postgresql/data
+    env_file:
+      - ./.env.localdev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    ports:
+      - "15432:5432"
+
+  flyway:
+    container_name: myapp-flyway
+    image: flyway/flyway:11-alpine
+    command: migrate
+    env_file:
+      - ./.env.localdev
+    volumes:
+      - ./db/flyway:/flyway/sql
+    depends_on:
+      db:
+        condition: service_healthy
+
+#  server:
+#    container_name: myapp-server
+#    image: myapp-server
+#    build:
+#      context: server
+#      dockerfile: Dockerfile
+#    restart: unless-stopped
+#    env_file:
+#      - ./.env.localdev
+#    depends_on:
+#      flyway:
+#        condition: service_completed_successfully
+#      db:
+#         condition: service_healthy
+#    ports:
+#      - "9090:9090" # TODO: Do not expose in prod
+#    volumes:
+#      #- ./server:/home/node/app
+#      #- ./server/dist:/home/node/app/dist
+#      - ./server/src:/home/node/app/src
+#      - ./.env.localdev:/home/node/.env.localdev
+#
+#  https-proxy:
+#    container_name: myapp-proxy
+#    image: caddy:2.6.2-alpine
+#    restart: unless-stopped
+#    depends_on:
+#      - server
+#    env_file:
+#      - ./.env.localdev
+#    ports:
+#      - 14080:14080
+#      - 14443:14443
+#    #      - "80:80"
+#    #      - "443:443"
+#    volumes:
+#      - ./proxy/Caddyfile:/etc/caddy/Caddyfile
+##      - ./client-react-mui/dist:/srv
+#      - ./runtime/caddy-data:/data
+#      - ./runtime/caddy-config:/config
+#    networks:
+#      myapp-net:
+#        ipv4_address: 172.25.0.40
+
+networks:
+  myapp-net:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.26.0.0/16
+
+#volumes:
+#  db:
